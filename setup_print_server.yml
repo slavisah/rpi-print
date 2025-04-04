@@ -1,0 +1,124 @@
+---
+- name: Setup Raspberry Pi Print Server
+  hosts: raspberrypi
+  become: true
+
+  vars:
+    printer_name: 'HP_P1006'
+    cups_admin_user: 'pi'
+    printer_model: 'drv:///hpcups.drv/hp-laserjet_p1006.ppd'
+
+  tasks:
+    - name: Update and upgrade system packages
+      apt:
+        update_cache: yes
+        upgrade: dist
+
+    - name: Install required packages
+      apt:
+        name:
+          - cups
+          - cups-bsd
+          - printer-driver-hpcups
+          - hplip
+          - avahi-daemon
+        state: present
+
+    - name: Add the CUPS admin user to the lpadmin group
+      user:
+        name: '{{ cups_admin_user }}'
+        groups: lpadmin
+        append: true
+
+    - name: Replace CUPS config with compatible version for CUPS 2.4+
+      copy:
+        dest: /etc/cups/cupsd.conf
+        content: |
+          LogLevel warn
+          PageLogFormat
+          MaxLogSize 0
+          Listen /var/run/cups/cups.sock
+          Port 631
+          Browsing On
+          BrowseLocalProtocols dnssd
+          DefaultAuthType Basic
+          WebInterface Yes
+
+          <Location />
+            Allow from 127.0.0.1
+            Allow from @LOCAL
+            Require valid-user
+          </Location>
+
+          <Location /admin>
+            Allow from 127.0.0.1
+            Allow from @LOCAL
+            Require valid-user
+          </Location>
+
+          <Location /admin/conf>
+            AuthType Default
+            Require user @SYSTEM
+            Allow from 127.0.0.1
+            Allow from @LOCAL
+          </Location>
+      notify: Restart CUPS
+
+    - name: Ensure proper ownership of CUPS config
+      file:
+        path: /etc/cups/cupsd.conf
+        owner: root
+        group: lp
+        mode: '0644'
+
+    - name: Enable and start the CUPS service
+      systemd:
+        name: cups
+        enabled: true
+        state: started
+
+    - name: Get list of available USB printer URIs
+      command: lpinfo --include-schemes=usb -v
+      register: printer_uris
+      changed_when: false
+      failed_when: false
+
+    - name: Set printer URI if HP device found
+      set_fact:
+        printer_uri: "{{ printer_uris.stdout_lines | select('search', 'HP') | list | first | regex_replace('^direct ', '') }}"
+      when: >
+        printer_uris.stdout_lines is defined and
+        (printer_uris.stdout_lines | select('search', 'HP') | list | length > 0)
+
+    - name: Warn if HPLIP plugin is likely missing
+      debug:
+        msg: >
+          "No HP printer detected or proprietary plugin might be missing.
+           SSH into the Pi and run 'hp-setup -i' after installing HPLIP manually."
+      when: printer_uri is not defined
+
+    - name: Add the HP printer with proper driver
+      command: >
+        lpadmin -p "{{ printer_name }}"
+        -v "{{ printer_uri }}"
+        -E
+        -m "{{ printer_model }}"
+      when: printer_uri is defined
+      ignore_errors: true
+
+    - name: Set default printer
+      command: lpadmin -d "{{ printer_name }}"
+      when: printer_uri is defined
+      ignore_errors: true
+
+    - name: Ensure Avahi daemon is enabled and started
+      systemd:
+        name: avahi-daemon
+        enabled: true
+        state: started
+
+  handlers:
+    - name: Restart CUPS
+      systemd:
+        name: cups
+        state: restarted
