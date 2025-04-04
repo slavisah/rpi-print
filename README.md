@@ -17,15 +17,15 @@ This project provides an Ansible-based setup for turning a Raspberry Pi into a n
 
 ## Architecture Overview
 
-<pre><code>```mermaid
+```mermaid
 flowchart LR
     subgraph Controller
-        A[Your Computer<br/>(Ansible Controller)]
+        A[Your Computer — Ansible Controller]
     end
 
     subgraph PrintServer
         B[CUPS]
-        C[Avahi (Bonjour)]
+        C[Avahi - Bonjour]
         D[HPLIP + Plugin]
         B --> USB
     end
@@ -38,7 +38,7 @@ flowchart LR
     end
 
     PrintServer -->|Bonjour/AirPrint| F
-```</code></pre>
+```
 
 ---
 
