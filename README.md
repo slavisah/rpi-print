@@ -17,28 +17,28 @@ This project provides an Ansible-based setup for turning a Raspberry Pi into a n
 
 ## Architecture Overview
 
-```mermaid
+<pre><code>```mermaid
 flowchart LR
-    subgraph LocalMachine[Your Computer (Ansible Controller)]
-        A[Ansible + SSH]
+    subgraph Controller
+        A[Your Computer<br/>(Ansible Controller)]
     end
 
-    subgraph RaspberryPi[Raspberry Pi Print Server]
+    subgraph PrintServer
         B[CUPS]
         C[Avahi (Bonjour)]
         D[HPLIP + Plugin]
-        B --> USBConnection
+        B --> USB
     end
 
     A -->|SSH + Ansible| B
-    USBConnection[USB Connection] --> E[HP LaserJet P1005]
+    USB[USB] --> E[HP LaserJet P1005]
 
-    subgraph NetworkClients[Client Devices]
+    subgraph Clients
         F[macOS / Windows / Linux]
     end
 
-    RaspberryPi -->|Bonjour/AirPrint| F
-```
+    PrintServer -->|Bonjour/AirPrint| F
+```</code></pre>
 
 ---
 
